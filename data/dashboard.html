@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMS Phishing Detection — Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap');
+ 
+  :root {
+    --bg: #090c10;
+    --bg2: #0d1117;
+    --bg3: #161b22;
+    --border: #21262d;
+    --green: #39d353;
+    --red: #f85149;
+    --yellow: #e3b341;
+    --blue: #58a6ff;
+    --muted: #484f58;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+  }
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+ 
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+ 
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+  }
+ 
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+ 
+  .logo-icon {
+    width: 32px; height: 32px;
+    border: 2px solid var(--red);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+ 
+  @keyframes pulse-border {
+    0%, 100% { border-color: var(--red); box-shadow: 0 0 0 0 rgba(248,81,73,0.4); }
+    50% { border-color: #ff6b6b; box-shadow: 0 0 0 6px rgba(248,81,73,0); }
+  }
+ 
+  .logo-text { font-family: var(--mono); font-size: 14px; letter-spacing: 2px; color: var(--text); }
+  .logo-sub { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; margin-top: 2px; }
+ 
+  .status-bar {
+    display: flex; align-items: center; gap: 20px;
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  }
+ 
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+ 
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+ 
+  .main { display: grid; grid-template-columns: 1fr 380px; height: calc(100vh - 65px); }
+ 
+  /* Left panel */
+  .left { display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+ 
+  /* Stats row */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+ 
+  .stat {
+    padding: 20px 24px;
+    border-right: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .stat:last-child { border-right: none; }
+ 
+  .stat-label {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+ 
+  .stat-value {
+    font-family: var(--mono); font-size: 32px; font-weight: 700;
+    line-height: 1;
+  }
+ 
+  .stat-value.red { color: var(--red); text-shadow: 0 0 20px rgba(248,81,73,0.3); }
+  .stat-value.green { color: var(--green); text-shadow: 0 0 20px rgba(57,211,83,0.3); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.blue { color: var(--blue); }
+ 
+  .stat-sub { font-size: 11px; color: var(--text-dim); margin-top: 6px; font-family: var(--mono); }
+ 
+  /* Test input area */
+  .test-area {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+ 
+  .section-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 12px;
+  }
+ 
+  .input-row { display: flex; gap: 8px; }
+ 
+  .sms-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+    padding: 10px 14px; border-radius: 6px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .sms-input:focus { border-color: var(--blue); }
+  .sms-input::placeholder { color: var(--muted); }
+ 
+  .sender-input {
+    width: 100px; background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 13px;
+    padding: 10px 14px; border-radius: 6px; outline: none;
+  }
+  .sender-input:focus { border-color: var(--blue); }
+ 
+  .analyze-btn {
+    background: var(--red); color: white; border: none;
+    padding: 10px 20px; border-radius: 6px; font-family: var(--mono);
+    font-size: 13px; letter-spacing: 1px; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .analyze-btn:hover { background: #ff6b6b; box-shadow: 0 0 16px rgba(248,81,73,0.4); }
+  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+ 
+  /* Feed */
+  .feed { flex: 1; overflow-y: auto; }
+  .feed::-webkit-scrollbar { width: 4px; }
+  .feed::-webkit-scrollbar-track { background: var(--bg); }
+  .feed::-webkit-scrollbar-thumb { background: var(--border); }
+ 
+  .feed-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 200px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px; gap: 8px;
+  }
+ 
+  .sms-card {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 16px; align-items: start;
+    animation: slide-in 0.3s ease;
+    transition: background 0.15s;
+  }
+  .sms-card:hover { background: var(--bg2); }
+ 
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+ 
+  .verdict-badge {
+    padding: 4px 10px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    font-weight: 700; white-space: nowrap; margin-top: 2px;
+  }
+  .verdict-badge.phishing { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+  .verdict-badge.normal { background: rgba(57,211,83,0.1); color: var(--green); border: 1px solid rgba(57,211,83,0.2); }
+ 
+  .card-body { min-width: 0; }
+  .card-sender { font-family: var(--mono); font-size: 12px; color: var(--blue); margin-bottom: 4px; }
+  .card-message { font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-word; }
+ 
+  .card-signals { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .signal-tag {
+    font-size: 10px; padding: 2px 8px; border-radius: 3px;
+    background: rgba(248,81,73,0.08); color: var(--red);
+    border: 1px solid rgba(248,81,73,0.2); font-family: var(--mono);
+  }
+ 
+  .card-meta { text-align: right; white-space: nowrap; }
+  .confidence-val { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .confidence-val.high { color: var(--red); }
+  .confidence-val.medium { color: var(--yellow); }
+  .confidence-val.low { color: var(--green); }
+  .risk-label { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-top: 2px; }
+  .card-time { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 4px; }
+ 
+  /* Right panel */
+  .right { background: var(--bg2); display: flex; flex-direction: column; overflow: hidden; }
+ 
+  .panel-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+  }
+ 
+  /* Quick tests */
+  .quick-tests { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+ 
+  .quick-btn {
+    width: 100%; text-align: left; background: var(--bg3);
+    border: 1px solid var(--border); color: var(--text-dim);
+    padding: 8px 12px; border-radius: 4px; font-family: var(--mono);
+    font-size: 11px; cursor: pointer; margin-bottom: 6px;
+    transition: all 0.15s; display: block;
+  }
+  .quick-btn:hover { border-color: var(--blue); color: var(--text); }
+  .quick-btn.phish:hover { border-color: var(--red); }
+  .quick-btn.ok:hover { border-color: var(--green); }
+  .quick-label { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+  .quick-label.phish { color: var(--red); }
+  .quick-label.ok { color: var(--green); }
+ 
+  /* Stats breakdown */
+  .breakdown { padding: 16px 20px; flex: 1; overflow-y: auto; }
+ 
+  .bar-row { margin-bottom: 14px; }
+  .bar-label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .bar-name { font-size: 12px; color: var(--text-dim); }
+  .bar-count { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .bar-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+ 
+  .api-status {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+ 
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡</div>
+    <div>
+      <div class="logo-text">SMS-SHIELD</div>
+      <div class="logo-sub">PHISHING DETECTION MONITOR</div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    <span id="api-url">API: localhost:8000</span>
+    <span id="clock"></span>
+  </div>
+</header>
+ 
+<div class="main">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">Total Analyzed</div>
+        <div class="stat-value blue" id="stat-total">0</div>
+        <div class="stat-sub">messages</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Phishing</div>
+        <div class="stat-value red" id="stat-phishing">0</div>
+        <div class="stat-sub" id="stat-rate">0.0% of total</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">High Risk</div>
+        <div class="stat-value yellow" id="stat-high">0</div>
+        <div class="stat-sub">flagged</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Normal</div>
+        <div class="stat-value green" id="stat-normal">0</div>
+        <div class="stat-sub">clean</div>
+      </div>
+    </div>
+ 
+    <div class="test-area">
+      <div class="section-title">Analyze SMS Message</div>
+      <div class="input-row">
+        <input class="sender-input" id="sender-input" placeholder="Sender" value="INFO">
+        <input class="sms-input" id="sms-input" placeholder="Enter SMS message to analyze...">
+        <button class="analyze-btn" id="analyze-btn" onclick="analyzeMessage()">SCAN</button>
+      </div>
+    </div>
+ 
+    <div class="feed" id="feed">
+      <div class="feed-empty" id="feed-empty">
+        <span style="font-size:24px">📡</span>
+        <span>Waiting for messages...</span>
+        <span style="font-size:11px;color:var(--muted)">Enter a message above or use quick tests →</span>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="panel-header">Quick Test Messages</div>
+    <div class="quick-tests">
+      <button class="quick-btn phish" onclick="quickTest('URGENT: Your account suspended. Verify: http://mci-secure.xyz/abc123', 'INFO')">
+        <div class="quick-label phish">⚠ PHISHING</div>
+        Account suspension + suspicious URL
+      </button>
+      <button class="quick-btn phish" onclick="quickTest('Congratulations! You won 5,000,000 IRR. Claim: http://bit.ly/win99', 'PRIZE')">
+        <div class="quick-label phish">⚠ PHISHING</div>
+        Prize claim + URL shortener
+      </button>
+      <button class="quick-btn phish" onclick="quickTest('Security alert: login from new device. Confirm: http://secure-login.tk/verify', 'ALERT')">
+        <div class="quick-label phish">⚠ PHISHING</div>
+        Security alert + .tk domain
+      </button>
+      <button class="quick-btn ok" onclick="quickTest('Your OTP code is 847291. Valid for 5 minutes. Do not share.', 'MCI')">
+        <div class="quick-label ok">✓ NORMAL</div>
+        OTP message from MCI
+      </button>
+      <button class="quick-btn ok" onclick="quickTest('Hi Sara, your appointment is confirmed for 2026-05-10 at 14:00.', 'Clinic')">
+        <div class="quick-label ok">✓ NORMAL</div>
+        Appointment confirmation
+      </button>
+      <button class="quick-btn ok" onclick="quickTest('Your order #543210 has been shipped. Expected delivery: 2026-05-03.', 'Digikala')">
+        <div class="quick-label ok">✓ NORMAL</div>
+        Delivery notification
+      </button>
+    </div>
+ 
+    <div class="panel-header" style="border-top: 1px solid var(--border);">Signal Breakdown</div>
+    <div class="breakdown" id="breakdown">
+      <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No data yet</div>
+    </div>
+ 
+    <div class="api-status" id="api-status">
+      Connecting to API...
+    </div>
+  </div>
+</div>
+ 
+<script>
+const API = 'http://localhost:8000';
+ 
+// Signal tracking
+const signalCounts = {};
+let totalCards = 0;
+ 
+// Clock
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+}
+setInterval(updateClock, 1000);
+updateClock();
+ 
+// Check API health
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    document.getElementById('api-status').innerHTML =
+      `<span style="color:var(--green)">● API ONLINE</span> · model: ${d.model_loaded ? 'loaded' : 'not loaded'}`;
+  } catch {
+    document.getElementById('api-status').innerHTML =
+      `<span style="color:var(--red)">● API OFFLINE</span> · start uvicorn first`;
+  }
+}
+ 
+// Load stats from API
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/stats`);
+    const d = await r.json();
+    document.getElementById('stat-total').textContent = d.total_analyzed;
+    document.getElementById('stat-phishing').textContent = d.total_phishing;
+    document.getElementById('stat-normal').textContent = d.total_normal;
+    document.getElementById('stat-high').textContent = d.high_risk;
+    const rate = d.total_analyzed > 0 ? (d.phishing_rate * 100).toFixed(1) : '0.0';
+    document.getElementById('stat-rate').textContent = `${rate}% of total`;
+  } catch {}
+}
+ 
+setInterval(loadStats, 3000);
+checkHealth();
+setInterval(checkHealth, 10000);
+ 
+// Analyze
+async function analyzeMessage() {
+  const message = document.getElementById('sms-input').value.trim();
+  const sender = document.getElementById('sender-input').value.trim() || 'UNKNOWN';
+  if (!message) return;
+ 
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+ 
+  try {
+    const r = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, sender })
+    });
+    const result = await r.json();
+    addCard(result);
+    loadStats();
+    document.getElementById('sms-input').value = '';
+  } catch (e) {
+    alert('API not reachable. Make sure uvicorn is running.');
+  }
+ 
+  btn.disabled = false;
+  btn.textContent = 'SCAN';
+}
+ 
+// Enter key
+document.getElementById('sms-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyzeMessage();
+});
+ 
+function quickTest(message, sender) {
+  document.getElementById('sms-input').value = message;
+  document.getElementById('sender-input').value = sender;
+  analyzeMessage();
+}
+ 
+function addCard(result) {
+  totalCards++;
+  const feed = document.getElementById('feed');
+  document.getElementById('feed-empty')?.remove();
+ 
+  const isPhishing = result.prediction === 'PHISHING';
+  const confPct = Math.round(result.confidence * 100);
+  const riskClass = result.risk_level === 'HIGH' ? 'high' : result.risk_level === 'MEDIUM' ? 'medium' : 'low';
+  const time = new Date().toLocaleTimeString('en-GB');
+ 
+  // Track signals
+  (result.signals || []).forEach(s => {
+    signalCounts[s] = (signalCounts[s] || 0) + 1;
+  });
+  updateBreakdown();
+ 
+  const card = document.createElement('div');
+  card.className = 'sms-card';
+  card.innerHTML = `
+    <div>
+      <div class="verdict-badge ${isPhishing ? 'phishing' : 'normal'}">
+        ${isPhishing ? '🚨 PHISH' : '✅ CLEAN'}
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-sender">${result.sender}</div>
+      <div class="card-message">${result.message_preview}</div>
+      ${result.signals?.length ? `
+        <div class="card-signals">
+          ${result.signals.map(s => `<span class="signal-tag">${s}</span>`).join('')}
+        </div>` : ''}
+    </div>
+    <div class="card-meta">
+      <div class="confidence-val ${riskClass}">${confPct}%</div>
+      <div class="risk-label">${result.risk_level} RISK</div>
+      <div class="card-time">${time}</div>
+    </div>
+  `;
+ 
+  feed.insertBefore(card, feed.firstChild);
+}
+ 
+function updateBreakdown() {
+  const el = document.getElementById('breakdown');
+  if (!Object.keys(signalCounts).length) return;
+ 
+  const max = Math.max(...Object.values(signalCounts));
+  const colors = {
+    'Contains URL': 'var(--red)',
+    'Suspicious domain extension (.xyz, .tk, .ru, etc.)': 'var(--yellow)',
+    'Urgency language detected': 'var(--blue)',
+    'Prize or reward language detected': '#a371f7',
+    'URL shortener detected': 'var(--green)',
+  };
+ 
+  el.innerHTML = Object.entries(signalCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => `
+      <div class="bar-row">
+        <div class="bar-label">
+          <span class="bar-name">${name.replace(' (.xyz, .tk, .ru, etc.)', '')}</span>
+          <span class="bar-count">${count}</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${(count/max*100).toFixed(0)}%;background:${colors[name] || 'var(--blue)'}"></div>
+        </div>
+      </div>
+    `).join('');
+}
+</script>
+</body>
+</html>
