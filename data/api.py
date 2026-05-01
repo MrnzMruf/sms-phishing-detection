@@ -61,7 +61,7 @@ stats = {
 
 # ── Load model on startup ─────────────────────────────────────────────────────
 
-MODEL_PATH = "models/phishing_model.pkl"
+MODEL_PATH = "../../models/phishing_model.pkl"
 pipeline = None
 
 @app.on_event("startup")
