@@ -22,7 +22,7 @@ import pandas as pd
 import requests
 
 API_URL = "http://localhost:8000/analyze"
-DATASET_PATH = "../data/sms_dataset.csv"  # adjust if needed
+DATASET_PATH = "../../data/sms_dataset.csv"
 
 
 def load_dataset(path: str) -> pd.DataFrame:
